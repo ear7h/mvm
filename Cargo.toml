@@ -1,0 +1,14 @@
+[package]
+name = "mvm"
+version = "0.1.0"
+authors = ["ear7h <julio.grillo98@gmail.com>"]
+edition = "2018"
+
+
+[[bin]]
+name = "mvm"
+path = "src/main.rs"
+
+
+
+[dependencies]
