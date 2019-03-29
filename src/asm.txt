@@ -1,0 +1,7 @@
+
+label:
+	INST val val
+	INST val label
+label2:
+	INST 99 label2
+	POP1 h
