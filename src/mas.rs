@@ -15,17 +15,20 @@
  *      -read nodes one by one put labels in a map
  */
 
-use std::iter::Peekable;
-use std::str::Chars;
+
 use std::collections::HashMap;
+use std::fmt;
 
 mod op_code;
 use op_code::Op;
 
+mod ast;
+use ast::Value;
+use ast::AstNode;
+
 macro_rules! dense_enum {
     ($name:ident;
-        $($var:ident) , * ,
-    ) => {
+        $($var:ident) , * ,) => {
         #[allow(dead_code)]
         #[derive(Debug)]
         pub enum $name {
@@ -50,230 +53,73 @@ macro_rules! dense_enum {
                 }
             }
         }
-    }
-}
 
-#[derive(Debug)]
-enum Value {
-    Label(String),
-    Addr(usize),
-    Int(i64),
-    Uint(u64),
-    Float(f32),
-    Str(String),
-    Err(String), // reults in a lex error
-}
-
-impl Value {
-    fn parse(s: String) -> Value {
-        let first = s.as_bytes()[0] as char;
-        match first {
-            '0'...'9' => {
-                if let Ok(num) = s.parse::<i64>() {
-                    Value::Int(num)
-                } else if let Ok(num) = s.parse::<u64>() {
-                    Value::Uint(num)
-                } else if let Ok(num) = s.parse::<f32>() {
-                    Value::Float(num)
-                } else {
-                    Value::Err(format!("unexpected string {}", s))
-                }
-            },
-            '"' => {
-                // remove the quotes
-                Value::Str(s.get(1..s.len()-1).unwrap().to_string())
-            },
-            '.' => return Value::Label(s),
-            '&' => {
-                match s.get(1..).unwrap().to_string().parse::<usize>() {
-                    Ok(x) => Value::Addr(x),
-                    Err(x) => Value::Err(format!("bad address {}", s))
-                }
-            },
-            // maybe someday this will be used for registers
-            _ => Value::Err(format!("unexpected string {}", s)),
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{}", self.to_str())
+            }
         }
     }
 }
 
-#[derive(Debug)]
-enum AstNode {
-    Tree(String, Vec<AstNode>), // name of program and the nodes
-    Cmd(AsmCmd, Vec<Value>), // command and arguments
-    Label(String), // name
-    Comment(String),
-}
 
-
-impl AstNode {
-    fn parse_cmd(chars: &mut Peekable<Chars>)
-        -> Result<AstNode, String> {
-
-            // read cmd
-            let mut cmd = String::new();
-            while let Some(&c) = chars.peek() {
-                match c {
-                    ' ' | '\t' | '\n' => break,
-                    _ => cmd.push(chars.next().unwrap()),
-                }
-            }
-            let cmd_res = AsmCmd::from_string(&cmd);
-            let cmd_cmd: AsmCmd;
-            match cmd_res {
-                Err(x) => return Err(x),
-                Ok(x) => cmd_cmd = x,
-            }
-            consumeln_ws(chars);
-
-            // read args
-            let mut args = Vec::new(); // return arr
-            let mut arg = String::new(); // current arg
-            'outer: while let Some(&c) = chars.peek() {
-                match c {
-                    ' ' | '\t' => {
-                        let argv = Value::parse(arg.clone());
-                        if let Value::Err(x) = argv {
-                            return Err(x);
-                        }
-
-                        args.push(argv);
-                        arg.clear();
-                        consumeln_ws(chars);
-                    },
-                    'a'...'z' | 'A'...'Z' | '0'...'9' => {
-                        arg.push(c);
-                        chars.next();
-                    },
-                    '"' => {
-                        arg.push(c);
-                        chars.next();
-                        while let Some(c) = chars.next() {
-                                arg.push(c);
-                            if c == '"' {
-                                continue 'outer;
-                            }
-                        }
-
-                        return Err("unclosed \"".to_string())
-                    },
-                    '\n' | ';' => break, // command line ends at \n or comment
-                    _ => return Err(
-                        format!("unexpected char parsing command {}", c)),
-                }
-            }
-
-            if !arg.is_empty() {
-                let argv = Value::parse(arg.clone());
-                if let Value::Err(x) = argv {
-                    return Err(x);
-                }
-
-                args.push(argv);
-            }
-
-            Ok(AstNode::Cmd(cmd_cmd, args))
-    }
-
-    fn parse_label(chars: &mut Peekable<Chars>)
-        -> Result<AstNode, String>  {
-
-            assert_eq!(chars.peek(), Some(&'.'));
-
-            let mut label = String::new();
-
-            while let Some(c) = chars.next() {
-                match c {
-                    ' ' | '\t' => {
-                        consume_ws(chars);
-                        break
-                    },
-                    '\n' => break,
-                    ':' => continue, // allow : for readability
-                    _ => label.push(c),
-                }
-            }
-
-            Ok(AstNode::Label(label))
-    }
-
-    fn parse_comment(chars: &mut Peekable<Chars>)
-        -> Result<AstNode, String>  {
-
-            assert_eq!(chars.next(), Some(';'));
-
-            let mut body = String::new();
-
-            while let Some(c) = chars.next() {
-                match c {
-                    '\n' => break,
-                    _ => body.push(c),
-                }
-            }
-
-            Ok(AstNode::Comment(body))
-    }
-}
-
-
-fn consumeln_ws(chars: &mut Peekable<Chars>) {
-    while let Some(&c) = chars.peek() {
-        if c == ' ' || c == '\t' {
-            chars.next();
-        } else {
-            return;
-        }
-    }
-}
-
-fn consume_ws(chars: &mut Peekable<Chars>) {
-    while let Some(&c) = chars.peek() {
-        if c == ' ' || c == '\t' || c == '\n' {
-            chars.next();
-        } else {
-            return;
-        }
-    }
-}
-
-fn parse(src: String) -> Result<AstNode, String> {
-    let name = "anon".to_string();
-    let mut nodes = Vec::new();
-
-    let mut chars = src.chars().peekable();
-    while let Some(&c) = chars.peek() {
-        let mut res: Result<AstNode, String>;
-        match c {
-            'a'...'z' | 'A'...'Z' => {
-                res = AstNode::parse_cmd(&mut chars);
-            },
-            '.' => {
-                res = AstNode::parse_label(&mut chars);
-            },
-            ';' => {
-                res = AstNode::parse_comment(&mut chars);
-            },
-            '\n' => {
-                chars.next();
-                continue
-            },
-            _ => return Err(format!("unexpected char {}", c)),
-        }
-        consume_ws(&mut chars);
-
-        match res {
-            Ok(x) => nodes.push(x),
-            Err(x) => return Err(x),
-        }
-    }
-
-    Ok(AstNode::Tree(name, nodes))
-}
-
-fn build(tree:&AstNode) -> Vec<u8> {
+fn compile(root:&AstNode) -> Result<Vec<u8>, String> {
     let mut ops:Vec<Op> = Vec::new();
-    let mut labels: HashMap<String, &usize> = HashMap::new();
+    let mut labels: HashMap<String, usize> = HashMap::new();
 
-    return vec![];
+    let nodes: &Vec<AstNode>;
+    if let AstNode::Tree(_, nodes1) = root {
+        nodes = nodes1;
+    } else {
+        panic!(format!("root is not AstNode::Tree, got {:?}", root))
+    }
+
+    let mut prog_size = 0usize;
+
+    // fill labels
+    for node in nodes {
+        match node {
+            AstNode::Cmd(cmd, args) => {
+                prog_size += match AsmCmd::size_from_string(cmd, args) {
+                    Ok(size) => size,
+                    Err(msg) => return Err(msg),
+                };
+            },
+            AstNode::Label(name) => {
+                match labels.get(name) {
+                    Some(addr) => {
+                        return Err(format!("label already defined {:?}", node))
+                    },
+                    None => {
+                        labels.insert(name.to_string(), prog_size);
+                    },
+                };
+            },
+            _ => {}, // ignore comments
+        }
+    }
+
+    // returned vector
+    let mut ret = Vec::with_capacity(prog_size);
+
+    // actually compile the program
+    for node in nodes {
+        match node {
+            AstNode::Cmd(cmd, args) => {
+                let instr = match AsmCmd::from_string(cmd) {
+                    Ok(cmd) => cmd.compile(args, &labels),
+                    Err(msg) => return Err(msg),
+                };
+                match instr {
+                    Ok(byt) => ret.extend(byt.iter()),
+                    Err(_) => return instr,
+                };
+            },
+            _ => {}, // ignore comments
+        }
+    }
+
+    return Ok(ret)
 }
 
 /**
@@ -303,31 +149,181 @@ dense_enum! { AsmCmd;
     PSHW, POPW,
 
     // extension codes
-    APG, FPG,
-    ASY,
-    CMT,
+//    APG, FPG,
+//    ASY,
+//   CMT,
 
-    STTC,
+    // STTC, // values in binary
+    // ALLO, // values requested
 }
 
 impl AsmCmd {
 
+    fn base_op_code(&self) -> u8 {
+        return match *self {
+            AsmCmd::ADDB | AsmCmd::ADDW => Op::ADD1,
+            AsmCmd::SUBB | AsmCmd::SUBW => Op::SUB1,
+            AsmCmd::MULB | AsmCmd::MULW => Op::MUL1,
+            AsmCmd::DIVB | AsmCmd::DIVW => Op::DIV1,
+            AsmCmd::SHRB | AsmCmd::SHRW => Op::SHR1,
+            AsmCmd::SHLB | AsmCmd::SHLW => Op::SHL1,
+            AsmCmd::ANDB | AsmCmd::ANDW => Op::AND1,
+            AsmCmd::ORRB | AsmCmd::ORRW => Op::ORR1,
+            AsmCmd::XORB | AsmCmd::XORW => Op::XOR1,
+            AsmCmd::CPYB | AsmCmd::CPYW => Op::CPY1,
+            AsmCmd::CPAB | AsmCmd::CPAW => Op::CPA1,
+            AsmCmd::PSHB | AsmCmd::PSHW => Op::PSH1,
+            AsmCmd::POPB | AsmCmd::POPW => Op::POP1,
+            _ => panic!("no base op for {}", self),
+        } as u8
+    }
+
+    /**
+     * offset based on size of the data being operated
+     */
+    fn base_op_offset(&self) -> u8 {
+        match self {
+            // byte
+            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
+            AsmCmd::SHRB | AsmCmd::SHLB |
+            AsmCmd::ANDB | AsmCmd::ORRB | AsmCmd::XORB |
+            AsmCmd::CPYB | AsmCmd::CPAB |
+            AsmCmd::PSHB | AsmCmd::POPW => 0,
+
+            // word
+            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
+            AsmCmd::SHRW | AsmCmd::SHLW |
+            AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW |
+            AsmCmd::CPYW | AsmCmd::CPAW |
+            AsmCmd::PSHW | AsmCmd::POPW => 2,
+
+            _ => panic!(format!("no offset for {}", self))
+        }
+    }
+
+    fn size_from_string(cmd: &String, args: &Vec<Value>)
+        -> Result<usize, String> {
+
+        let cmd1 = match AsmCmd::from_string(cmd) {
+            Ok(x) => x,
+            Err(x) => return Err(x),
+        };
+
+        let ret = match cmd1 {
+            AsmCmd::NOP | AsmCmd::XIT | AsmCmd::RET=> 1, // no arg
+            AsmCmd::JMP | AsmCmd::CAL => 1 + 8, // op code and jump address
+            AsmCmd::JIT => 1 + 8 + 8, // op code jump address, boolean address
+            AsmCmd::CPAB | AsmCmd::CPAW => 1 + 8 + 8, // op code, dsr addr, src addr
+            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
+            AsmCmd::SHRB | AsmCmd::SHLB | AsmCmd::ANDB | AsmCmd::ORRB |
+            AsmCmd::XORB | AsmCmd::CPYB => {
+
+                if args.len() != 2 {
+                    return Err(
+                        format!("expected 2 args to {} got {:?}", cmd1, args));
+                };
+
+                // op code + dst + (src | val)
+                1 + 8 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    Value::Int(_) | Value::Uint(_) => 1,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
+            AsmCmd::SHRW | AsmCmd::SHLW | AsmCmd::ANDW | AsmCmd::ORRW |
+            AsmCmd::XORW | AsmCmd::CPYW => {
+
+                if args.len() != 2 {
+                    return Err(
+                        format!("expected 2 args to {} got {:?}", cmd1, args));
+                };
+
+                // op code + dst + (src | val)
+                1 + 8 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    Value::Int(_) | Value::Uint(_) => 8,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            AsmCmd::ADDF | AsmCmd::SUBF | AsmCmd::MULF | AsmCmd::DIVF => {
+                if args.len() != 2 {
+                    return Err(
+                        format!("expected 2 args to {} got {:?}", cmd1, args));
+                };
+
+                // op code + dst + (src | val)
+                1 + 8 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    Value::Int(_) | Value::Uint(_) => 4,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            AsmCmd::PSHB => {
+                if args.len() != 1 {
+                    return Err(
+                        format!("expected 1 args to {} got {:?}", cmd1, args));
+                };
+
+                1 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    Value::Int(_) | Value::Uint(_) => 1,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            AsmCmd::PSHW => {
+                if args.len() != 1 {
+                    return Err(
+                        format!("expected 1 args to {} got {:?}", cmd1, args));
+                };
+
+                1 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    Value::Int(_) | Value::Uint(_) => 8,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            AsmCmd::POPB | AsmCmd::POPW => {
+                if args.len() != 1 {
+                    return Err(
+                        format!("expected 1 args to {} got {:?}", cmd1, args));
+                };
+
+                1 + match args[1] {
+                    Value::Label(_) | Value::Addr(_) => 8,
+                    _ => return Err(format!("unexpected argument {:?}", args[1])),
+                }
+            },
+            _ => return panic!(format!("{} does not have an op code", cmd1))
+        };
+
+        return Ok(ret)
+    }
+
     fn compile<'a>(&self,
                args: &Vec<Value>,
-               labels: &'a mut HashMap<String, usize>)
+               labels: &'a HashMap<String, usize>)
         -> Result<Vec<u8>, String> {
 
         match self {
-            NOP => {
+            AsmCmd::NOP => {
                 Ok(vec![Op::NOP as u8])
             },
-            XIT => {
+            AsmCmd::XIT => {
                 Ok(vec![Op::XIT as u8])
             },
-            ADDB => {
+                // byte
+            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
+            AsmCmd::SHRB | AsmCmd::SHLB |
+            AsmCmd::ANDB | AsmCmd::ORRB | AsmCmd::XORB |
+
+            // word
+            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
+            AsmCmd::SHRW | AsmCmd::SHLW |
+            AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW => {
                 if args.len() != 2 {
                     return Err(
-                        format!("expected 2 args to  ADDB got {:?}", args));
+                        format!("expected 2 args to {} got {:?}", self, args));
                 };
 
                 let dst = match &args[0] {
@@ -345,13 +341,15 @@ impl AsmCmd {
 
                 match &args[1] {
                     Value::Addr(src) => {
-                        let mut ret = vec![Op::ADD3 as u8];
+                        let mut ret =
+                            vec![self.base_op_code() + self.base_op_offset() + 1];
                         ret.extend_from_slice(&dst.to_le_bytes());
                         ret.extend_from_slice(&src.to_le_bytes());
                         Ok(ret)
                     },
                     Value::Label(x) => {
-                        let mut ret = vec![Op::ADD3 as u8];
+                        let mut ret =
+                            vec![self.base_op_code() + self.base_op_offset() + 1];
                         ret.extend_from_slice(&dst.to_le_bytes());
                         if let Some(src) = labels.get(x) {
                             ret.extend_from_slice(&src.to_le_bytes());
@@ -361,67 +359,23 @@ impl AsmCmd {
                         }
                     },
                     Value::Int(src) => {
-                        let mut ret = vec![Op::ADD1 as u8];
+                        let mut ret =
+                            vec![self.base_op_code() + self.base_op_offset()];
                         ret.extend_from_slice(&dst.to_le_bytes());
-                        ret.push(*src as u8);
+                        ret.extend_from_slice(
+                            &src
+                            .to_le_bytes()[
+                                ..if 0 == self.base_op_offset() {1} else {8}]);
                         Ok(ret)
                     },
                     Value::Uint(src) => {
-                        let mut ret = vec![Op::ADD1 as u8];
+                        let mut ret =
+                            vec![self.base_op_code() + self.base_op_offset()];
                         ret.extend_from_slice(&dst.to_le_bytes());
-                        ret.push(*src as u8);
-                        Ok(ret)
-                    },
-                    _ => Err(
-                        format!("unexpected arg {:?}", args[1])),
-                }
-            },
-            ADDW => {
-                if args.len() != 2 {
-                    return Err(
-                        format!("expected 2 args to  ADDB got {:?}", args));
-                };
-
-                let dst = match &args[0] {
-                    Value::Label(x) => {
-                        if let Some(&y) = labels.get(x) {
-                            y
-                        } else {
-                            return Err(format!("label {} not defined", x))
-                        }
-                    },
-                    Value::Addr(x) => *x,
-                    _ => return Err(
-                        format!("dst arg must be addr-like got {:?}", args[0])),
-                };
-
-                match &args[1] {
-                    Value::Addr(src) => {
-                        let mut ret = vec![Op::ADD4 as u8];
-                        ret.extend_from_slice(&dst.to_le_bytes());
-                        ret.extend_from_slice(&src.to_le_bytes());
-                        Ok(ret)
-                    },
-                    Value::Label(x) => {
-                        let mut ret = vec![Op::ADD4 as u8];
-                        ret.extend_from_slice(&dst.to_le_bytes());
-                        if let Some(src) = labels.get(x) {
-                            ret.extend_from_slice(&src.to_le_bytes());
-                            Ok(ret)
-                        } else {
-                            Err(format!("label {} not defined", x))
-                        }
-                    },
-                    Value::Int(src) => {
-                        let mut ret = vec![Op::ADD2 as u8];
-                        ret.extend_from_slice(&dst.to_le_bytes());
-                        ret.extend_from_slice(&src.to_le_bytes());
-                        Ok(ret)
-                    },
-                    Value::Uint(src) => {
-                        let mut ret = vec![Op::ADD2 as u8];
-                        ret.extend_from_slice(&dst.to_le_bytes());
-                        ret.extend_from_slice(&src.to_le_bytes());
+                        ret.extend_from_slice(
+                            &src
+                            .to_le_bytes()[
+                                ..if 0 == self.base_op_offset() {1} else {8}]);
                         Ok(ret)
                     },
                     _ => Err(
@@ -436,7 +390,7 @@ impl AsmCmd {
 
 
 
-const prog:&str = "; our nifty little program
+const prog1:&str = "; our nifty little program
 .start
     FAD arg1 arg2
 \tFSU  arg2
@@ -444,8 +398,21 @@ const prog:&str = "; our nifty little program
     STTC \"asd\"
     ; comment 3";
 
+const prog2:&str = "; program 2
+.start
+    addb &99 22
+    addb .globals &99
+.globals";
+
 fn main() {
-    println!("{}", prog);
-    let res = parse(prog.to_string());
-    println!("{:?}", res);
+    println!("{}", prog1);
+    let res1 = ast::parse(prog1.to_string());
+    println!("{:?}", res1);
+
+    println!("{}", prog2);
+    let res2 = ast::parse(prog2.to_string());
+    println!("{:?}", res2);
+
+    println!("{:?}", compile(&res2.unwrap()));
+
 }

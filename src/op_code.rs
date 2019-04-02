@@ -31,8 +31,8 @@ macro_rules! dense_enum {
 
 /*
  * 1 -> 1 byte       left is ptr, right is val
- * 2 -> 8 bytes      left is ptr, right is val
- * 3 -> 1 byte       left + right are ptrs
+ * 2 -> 1 byte       left + right are ptrs
+ * 3 -> 8 bytes      left is ptr, right is val
  * 4 -> 8 bytes      left + right are ptrs
  */
 dense_enum! { Op;
