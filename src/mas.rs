@@ -407,7 +407,8 @@ impl AsmCmd {
 
 const prog2:&str = "; program 2
 .start
-    addb ._zero 99 ; asd
+    addb ._zero 10 ; asd
+    modb ._zero 7  ; another line
     xit
 .globals";
 
