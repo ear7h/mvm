@@ -44,6 +44,7 @@ dense_enum! { Op;
     SUB1, SUB2, SUB3, SUB4,
     MUL1, MUL2, MUL3, MUL4,
     DIV1, DIV2, DIV3, DIV4,
+    MOD1, MOD2, MOD3, MOD4,
     // bitwise shift
     SHR1, SHR2, SHR3, SHR4,
     SHL1, SHL2, SHL3, SHL4,
@@ -57,8 +58,6 @@ dense_enum! { Op;
 
     // copy pointed to
     CPY1, CPY2, CPY3, CPY4,
-    // copy pointed to to
-    CPA1, CPA2, CPA3, CPA4,
 
     // turing completenes
     JMP1, JMP2, // 1: static address, 2: dynamic address

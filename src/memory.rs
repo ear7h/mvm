@@ -1,9 +1,11 @@
-pub const KB:usize = 1024;
-pub const MB:usize = KB * KB;
+const KB:usize = 1024;
+const MB:usize = KB * KB;
 
-pub const FAST_SIZE: usize = 32 * KB;
-pub const PAGE_SIZE: usize = 4 * KB;
-pub const CACHE_LINE: usize = 64;
+const FAST_SIZE: usize = 32 * KB;
+const PAGE_SIZE: usize = 4 * KB;
+const MAX_FRAME: usize = 64;
+
+pub const PROG_OFFSET:usize = MAX_FRAME;
 
 pub struct Memory {
     fast: [u8; FAST_SIZE],
@@ -17,7 +19,7 @@ impl Memory {
         let mut ret = Memory{
             fast: [0; FAST_SIZE],
             page: vec![],
-            sp: FAST_SIZE + CACHE_LINE - 1,
+            sp: FAST_SIZE - 1,
         };
 
         ret.fast[1..code.len()+1].clone_from_slice(code);
@@ -31,18 +33,18 @@ impl Memory {
             if item.is_none() {
                 item.replace([0; PAGE_SIZE]);
 
-                return CACHE_LINE + FAST_SIZE + (i * PAGE_SIZE);
+                return MAX_FRAME + FAST_SIZE + (i * PAGE_SIZE);
             }
         }
 
         let i = self.page.len();
         self.page.push(Some([0; PAGE_SIZE]));
 
-        return CACHE_LINE + FAST_SIZE + (i * PAGE_SIZE);
+        return MAX_FRAME + FAST_SIZE + (i * PAGE_SIZE);
     }
 
     pub fn free_page(&mut self, addr:usize) {
-        let i = (addr - CACHE_LINE - FAST_SIZE) / PAGE_SIZE;
+        let i = (addr - MAX_FRAME - FAST_SIZE) / PAGE_SIZE;
 
         std::mem::drop(self.page[i].expect("page does not exist"));
 
@@ -68,10 +70,10 @@ impl Memory {
          * 0                    __ null
          * |
          * |
-         * CACHE_LINE-1         __ relative addresses
+         * MAX_FRAME            __ relative addresses
          * |
          * |
-         * FAST_SIZE+CACHE_LINE __ fast memory
+         * FAST_SIZE+MAX_FRAME  __ fast memory
          * |
          * |
          * :                    __ page memory
@@ -81,10 +83,10 @@ impl Memory {
 
         if addr == 0 {
             panic!("null pointer deref");
-        } else if addr <= CACHE_LINE {
+        } else if addr < MAX_FRAME {
             addr1 = self.sp - addr;
         } else {
-            addr1 = addr - CACHE_LINE;
+            addr1 = addr - MAX_FRAME;
         }
 
         // set the pointer
@@ -116,10 +118,10 @@ impl Memory {
 
         if addr == 0 {
             panic!("null pointer deref");
-        } else if addr <= CACHE_LINE {
+        } else if addr < MAX_FRAME {
             addr1 = self.sp - addr;
         } else {
-            addr1 = addr - CACHE_LINE;
+            addr1 = addr - MAX_FRAME;
         }
 
         // set the pointer

@@ -22,6 +22,8 @@ use std::fmt;
 mod op_code;
 use op_code::Op;
 
+mod memory;
+
 mod ast;
 use ast::Value;
 use ast::AstNode;
@@ -67,6 +69,9 @@ fn compile(root:&AstNode) -> Result<Vec<u8>, String> {
     let mut ops:Vec<Op> = Vec::new();
     let mut labels: HashMap<String, usize> = HashMap::new();
 
+    // builtin labels
+    labels.insert("._zero".to_string(), memory::PROG_OFFSET);
+
     let nodes: &Vec<AstNode>;
     if let AstNode::Tree(_, nodes1) = root {
         nodes = nodes1;
@@ -74,7 +79,7 @@ fn compile(root:&AstNode) -> Result<Vec<u8>, String> {
         panic!(format!("root is not AstNode::Tree, got {:?}", root))
     }
 
-    let mut prog_size = 0usize;
+    let mut prog_size = 1usize; // the 0 byte is for an exit code
 
     // fill labels
     for node in nodes {
@@ -91,7 +96,8 @@ fn compile(root:&AstNode) -> Result<Vec<u8>, String> {
                         return Err(format!("label already defined {:?}", node))
                     },
                     None => {
-                        labels.insert(name.to_string(), prog_size);
+                        labels.insert(name.to_string(),
+                            prog_size + memory::PROG_OFFSET);
                     },
                 };
             },
@@ -130,19 +136,18 @@ dense_enum! { AsmCmd;
     NOP, XIT,
 
     // byte
-    ADDB, SUBB, MULB, DIVB,
+    ADDB, SUBB, MULB, DIVB, MODB,
     SHRB, SHLB,
     ANDB, ORRB, XORB,
 
     // word
-    ADDW, SUBW, MULW, DIVW,
+    ADDW, SUBW, MULW, DIVW, MODW,
     SHRW, SHLW,
     ANDW, ORRW, XORW,
 
     ADDF, SUBF, MULF, DIVF,
 
-    CPYB, CPAB,
-    CPYW, CPAW,
+    CPYB, CPYW,
     JMP, JIT, CAL, RET,
 
     PSHB, POPB,
@@ -165,13 +170,13 @@ impl AsmCmd {
             AsmCmd::SUBB | AsmCmd::SUBW => Op::SUB1,
             AsmCmd::MULB | AsmCmd::MULW => Op::MUL1,
             AsmCmd::DIVB | AsmCmd::DIVW => Op::DIV1,
+            AsmCmd::MODB | AsmCmd::MODW => Op::MOD1,
             AsmCmd::SHRB | AsmCmd::SHRW => Op::SHR1,
             AsmCmd::SHLB | AsmCmd::SHLW => Op::SHL1,
             AsmCmd::ANDB | AsmCmd::ANDW => Op::AND1,
             AsmCmd::ORRB | AsmCmd::ORRW => Op::ORR1,
             AsmCmd::XORB | AsmCmd::XORW => Op::XOR1,
             AsmCmd::CPYB | AsmCmd::CPYW => Op::CPY1,
-            AsmCmd::CPAB | AsmCmd::CPAW => Op::CPA1,
             AsmCmd::PSHB | AsmCmd::PSHW => Op::PSH1,
             AsmCmd::POPB | AsmCmd::POPW => Op::POP1,
             _ => panic!("no base op for {}", self),
@@ -184,17 +189,17 @@ impl AsmCmd {
     fn base_op_offset(&self) -> u8 {
         match self {
             // byte
-            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
+            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB | AsmCmd::MODB |
             AsmCmd::SHRB | AsmCmd::SHLB |
             AsmCmd::ANDB | AsmCmd::ORRB | AsmCmd::XORB |
-            AsmCmd::CPYB | AsmCmd::CPAB |
+            AsmCmd::CPYB |
             AsmCmd::PSHB | AsmCmd::POPW => 0,
 
             // word
-            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
+            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW | AsmCmd::MODW |
             AsmCmd::SHRW | AsmCmd::SHLW |
             AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW |
-            AsmCmd::CPYW | AsmCmd::CPAW |
+            AsmCmd::CPYW |
             AsmCmd::PSHW | AsmCmd::POPW => 2,
 
             _ => panic!(format!("no offset for {}", self))
@@ -213,10 +218,12 @@ impl AsmCmd {
             AsmCmd::NOP | AsmCmd::XIT | AsmCmd::RET=> 1, // no arg
             AsmCmd::JMP | AsmCmd::CAL => 1 + 8, // op code and jump address
             AsmCmd::JIT => 1 + 8 + 8, // op code jump address, boolean address
-            AsmCmd::CPAB | AsmCmd::CPAW => 1 + 8 + 8, // op code, dsr addr, src addr
-            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
-            AsmCmd::SHRB | AsmCmd::SHLB | AsmCmd::ANDB | AsmCmd::ORRB |
-            AsmCmd::XORB | AsmCmd::CPYB => {
+
+            AsmCmd::ADDB | AsmCmd::SUBB |
+            AsmCmd::MULB | AsmCmd::DIVB | AsmCmd::MODB |
+            AsmCmd::SHRB | AsmCmd::SHLB |
+            AsmCmd::ANDB | AsmCmd::ORRB | AsmCmd::XORB |
+            AsmCmd::CPYB => {
 
                 if args.len() != 2 {
                     return Err(
@@ -230,9 +237,12 @@ impl AsmCmd {
                     _ => return Err(format!("unexpected argument {:?}", args[1])),
                 }
             },
-            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
-            AsmCmd::SHRW | AsmCmd::SHLW | AsmCmd::ANDW | AsmCmd::ORRW |
-            AsmCmd::XORW | AsmCmd::CPYW => {
+
+            AsmCmd::ADDW | AsmCmd::SUBW |
+            AsmCmd::MULW | AsmCmd::DIVW | AsmCmd::MODW |
+            AsmCmd::SHRW | AsmCmd::SHLW |
+            AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW |
+            AsmCmd::CPYW => {
 
                 if args.len() != 2 {
                     return Err(
@@ -246,6 +256,7 @@ impl AsmCmd {
                     _ => return Err(format!("unexpected argument {:?}", args[1])),
                 }
             },
+
             AsmCmd::ADDF | AsmCmd::SUBF | AsmCmd::MULF | AsmCmd::DIVF => {
                 if args.len() != 2 {
                     return Err(
@@ -312,15 +323,20 @@ impl AsmCmd {
             AsmCmd::XIT => {
                 Ok(vec![Op::XIT as u8])
             },
-                // byte
-            AsmCmd::ADDB | AsmCmd::SUBB | AsmCmd::MULB | AsmCmd::DIVB |
+
+            // byte
+            AsmCmd::ADDB | AsmCmd::SUBB |
+            AsmCmd::MULB | AsmCmd::DIVB | AsmCmd::MODB |
             AsmCmd::SHRB | AsmCmd::SHLB |
             AsmCmd::ANDB | AsmCmd::ORRB | AsmCmd::XORB |
+            AsmCmd::CPYB |
 
             // word
-            AsmCmd::ADDW | AsmCmd::SUBW | AsmCmd::MULW | AsmCmd::DIVW |
+            AsmCmd::ADDW | AsmCmd::SUBW |
+            AsmCmd::MULW | AsmCmd::DIVW | AsmCmd::MODW |
             AsmCmd::SHRW | AsmCmd::SHLW |
-            AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW => {
+            AsmCmd::ANDW | AsmCmd::ORRW | AsmCmd::XORW |
+            AsmCmd::CPYW => {
                 if args.len() != 2 {
                     return Err(
                         format!("expected 2 args to {} got {:?}", self, args));
@@ -389,25 +405,13 @@ impl AsmCmd {
 
 
 
-
-const prog1:&str = "; our nifty little program
-.start
-    FAD arg1 arg2
-\tFSU  arg2
-    FAD ; comment 2
-    STTC \"asd\"
-    ; comment 3";
-
 const prog2:&str = "; program 2
 .start
-    addb &99 22
-    addb .globals &99
+    addb ._zero 99 ; asd
+    xit
 .globals";
 
 fn main() {
-    println!("{}", prog1);
-    let res1 = ast::parse(prog1.to_string());
-    println!("{:?}", res1);
 
     println!("{}", prog2);
     let res2 = ast::parse(prog2.to_string());

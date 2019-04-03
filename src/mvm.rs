@@ -13,13 +13,13 @@ fn eval(code: &[u8]) -> u8 {
     loop {
 
         let op:u8 = memory.get(pc);
+        println!("{:?}", Op::from_int(op));
         pc += 1;
 
-        match Op::from_primitive(op) {
+        match Op::from_int(op) {
             Op::NOP => {},// nop
             Op::XIT => {
-                let a = memory.get1(pc);
-                return memory.get::<u8>(a);
+                return memory.get::<u8>(memory::PROG_OFFSET);
             },
 
             //
@@ -27,380 +27,389 @@ fn eval(code: &[u8]) -> u8 {
             //
 
             Op::ADD1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa + bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv + srcv);
             },
             Op::ADD2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa + bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv + srcv);
             },
             Op::ADD3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa + bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv + srcv);
             },
             Op::ADD4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa + bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv + srcv);
             },
 
             Op::SUB1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa - bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv - srcv);
             },
             Op::SUB2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa - bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv - srcv);
             },
             Op::SUB3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa - bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv - srcv);
             },
             Op::SUB4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa - bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv - srcv);
             },
 
             Op::MUL1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa * bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv * srcv);
             },
             Op::MUL2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa * bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv * srcv);
             },
             Op::MUL3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa * bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv * srcv);
             },
             Op::MUL4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa * bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv * srcv);
             },
 
             Op::DIV1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa / bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv / srcv);
             },
             Op::DIV2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa / bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv / srcv);
             },
             Op::DIV3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa / bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv / srcv);
             },
             Op::DIV4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa / bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv / srcv);
+            },
+
+            Op::MOD1 => {
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv % srcv);
+            },
+            Op::MOD2 => {
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv % srcv);
+            },
+            Op::MOD3 => {
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv % srcv);
+            },
+            Op::MOD4 => {
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv % srcv);
             },
 
             Op::SHR1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa >> bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv >> srcv);
             },
             Op::SHR2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa >> bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv >> srcv);
             },
             Op::SHR3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa >> bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv >> srcv);
             },
             Op::SHR4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa >> bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv >> srcv);
             },
-
 
             Op::SHL1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa << bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv << srcv);
             },
             Op::SHL2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa << bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv << srcv);
             },
             Op::SHL3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa << bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv << srcv);
             },
             Op::SHL4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa << bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv << srcv);
             },
 
+
             Op::AND1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa & bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv & srcv);
             },
             Op::AND2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa & bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv & srcv);
             },
             Op::AND3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa & bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv & srcv);
             },
             Op::AND4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa & bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv & srcv);
             },
 
             Op::ORR1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa | bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv | srcv);
             },
             Op::ORR2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa | bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv | srcv);
             },
             Op::ORR3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa | bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv | srcv);
             },
             Op::ORR4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa | bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv | srcv);
             },
 
             Op::XOR1 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u8 = memory.get(a);
-                let bb: u8 = memory.get(b);
-                memory.set(a, aa ^ bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, dstv ^ srcv);
             },
             Op::XOR2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u16 = memory.get(a);
-                let bb: u16 = memory.get(b);
-                memory.set(a, aa ^ bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv ^ srcv);
             },
             Op::XOR3 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u32 = memory.get(a);
-                let bb: u32 = memory.get(b);
-                memory.set(a, aa ^ bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let dstv: u64 = memory.get(dst);
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, dstv ^ srcv);
             },
             Op::XOR4 => {
-                let [a, b] = memory.get2(pc);
-                let aa: u64 = memory.get(a);
-                let bb: u64 = memory.get(b);
-                memory.set(a, aa ^ bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let dstv: u8 = memory.get(dst);
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, dstv ^ srcv);
             },
 
             //
             // floating point ops
             //
 
-            Op::ADDF1 => {
+            Op::ADDF => {
                 let [a, b] = memory.get2(pc);
                 let aa: f32 = memory.get(a);
                 let bb: f32 = memory.get(b);
                 memory.set(a, aa + bb);
             },
-            Op::ADDF2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: f64 = memory.get(a);
-                let bb: f64 = memory.get(b);
-                memory.set(a, aa + bb);
-            },
-
-            Op::SUBF1 => {
+            Op::SUBF => {
                 let [a, b] = memory.get2(pc);
                 let aa: f32 = memory.get(a);
                 let bb: f32 = memory.get(b);
                 memory.set(a, aa - bb);
             },
-            Op::SUBF2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: f64 = memory.get(a);
-                let bb: f64 = memory.get(b);
-                memory.set(a, aa - bb);
-            },
-
-            Op::MULF1 => {
+            Op::MULF => {
                 let [a, b] = memory.get2(pc);
                 let aa: f32 = memory.get(a);
                 let bb: f32 = memory.get(b);
                 memory.set(a, aa * bb);
             },
-            Op::MULF2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: f64 = memory.get(a);
-                let bb: f64 = memory.get(b);
-                memory.set(a, aa * bb);
-            },
-
-            Op::DIVF1 => {
+            Op::DIVF => {
                 let [a, b] = memory.get2(pc);
                 let aa: f32 = memory.get(a);
                 let bb: f32 = memory.get(b);
                 memory.set(a, aa / bb);
             },
-            Op::DIVF2 => {
-                let [a, b] = memory.get2(pc);
-                let aa: f64 = memory.get(a);
-                let bb: f64 = memory.get(b);
-                memory.set(a, aa / bb);
-            },
+
+            //
+            // memory operations
+            //
 
             Op::CPY1 => {
-                let [a, b] = memory.get2(pc);
-                let bb: u8 = memory.get(b);
-                memory.set(a, bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let srcv: u8 = memory.get(pc);
+                pc += 1;
+                memory.set(dst, srcv);
             },
             Op::CPY2 => {
-                let [a, b] = memory.get2(pc);
-                let bb: u16 = memory.get(b);
-                memory.set(a, bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, srcv);
             },
             Op::CPY3 => {
-                let [a, b] = memory.get2(pc);
-                let bb: u32 = memory.get(b);
-                memory.set(a, bb);
+                let dst: usize = memory.get(pc);
+                pc += 8;
+                let srcv: u64 = memory.get(pc);
+                pc += 8;
+                memory.set(dst, srcv);
             },
             Op::CPY4 => {
-                let [a, b] = memory.get2(pc);
-                let bb: u64 = memory.get(b);
-                memory.set(a, bb);
+                let [dst, src] = memory.get2(pc);
+                pc += 16;
+                let srcv: u8 = memory.get(src);
+                memory.set(dst, srcv);
             },
 
-            Op::CPA1 => {
-                let [a, b] = memory.get2(pc);
-                let bb: usize = memory.get(b);
-                let bbb: u8 = memory.get(bb);
-                memory.set(a, bbb);
-            },
-            Op::CPA2 => {
-                let [a, b] = memory.get2(pc);
-                let bb: usize = memory.get(b);
-                let bbb: u16 = memory.get(bb);
-                memory.set(a, bbb);
-            },
-            Op::CPA3 => {
-                let [a, b] = memory.get2(pc);
-                let bb: usize = memory.get(b);
-                let bbb: u32 = memory.get(bb);
-                memory.set(a, bbb);
-            },
-            Op::CPA4 => {
-                let [a, b] = memory.get2(pc);
-                let bb: usize = memory.get(b);
-                let bbb: u64 = memory.get(bb);
-                memory.set(a, bbb);
-            },
+            code => panic!(format!("{:?} not implemented", code)),
 
-            //
-            // control flow
-            //
-
-            Op::JMP => {
-                pc = memory.get1(pc);
-            },
-            Op::JIT => {
-                let [loc, val] = memory.get2(pc);
-                if memory.get::<u64>(val) != 0 {
-                    pc = memory.get1(loc);
-                };
-            },
-            Op::CAL => {
-                let loc = memory.get1(pc);
-                memory.push_addr(pc);
-                pc = loc;
-            },
-            Op::RET => {
-                pc = memory.pop_addr();
-            }
-
-            //
-            // page management
-            //
-
-            Op::ALP => {
-                let loc = memory.alloc_page();
-                memory.set(pc, loc);
-            },
-            Op::FRP => {
-                let loc = memory.get1(pc);
-                memory.free_page(loc);
-            },
-
-            Op::ASY => {
-                panic!("async not implemented")
-            }
-
-            Op::EXT => {
-                panic!("extensions not implemented");
-            }
         }
     }
+
+    println!("{:?}", memory.get::<[u8; 32]>(0));
 }
 
 fn main() {
-    eval(&[1]);
-    println!("Hello, world!");
+    let s = eval(&[
+                    Op::ADD1 as u8, 64, 0, 0, 0, 0, 0, 0, 0, 10,
+                    Op::MOD1 as u8, 64, 0, 0, 0, 0, 0, 0, 0, 7,
+                    Op::XIT as u8]);
+    println!("{}", s);
+    std::process::exit(s as i32);
 }
